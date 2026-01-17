@@ -283,6 +283,19 @@ class BulkUpdateRequestTest < ActiveSupport::TestCase
           assert_equal("approved", @bur.reload.status)
         end
 
+        should "assign the right category to a new umbrella tag" do
+          create(:tag, name: "daniel_booru_(bald)", category: Tag.categories.character)
+          create(:wiki_page, title: "daniel_booru_(bald)")
+          create(:wiki_page, title: "daniel_booru")
+          @bur = create_bur!("create implication daniel_booru_(bald) -> daniel_booru", @admin)
+
+          @implication = TagImplication.find_by(antecedent_name: "daniel_booru_(bald)", consequent_name: "daniel_booru")
+          assert_equal(true, @implication.present?)
+          assert_equal(true, @implication.is_active?)
+          assert_equal("approved", @bur.reload.status)
+          assert_equal(Tag.categories.character, Tag.find_by_name("daniel_booru").category)
+        end
+
         should "fail for an implication that is redundant with an existing implication" do
           create(:tag_implication, antecedent_name: "a", consequent_name: "b")
           create(:tag_implication, antecedent_name: "b", consequent_name: "c")
@@ -925,6 +938,15 @@ class BulkUpdateRequestTest < ActiveSupport::TestCase
           assert_equal(["Bulk update request is too long (maximum size: 100 lines). Split your request into smaller chunks and try again."], @bur.errors.full_messages)
         end
       end
+
+      context "a bulk update request with duplicate lines" do
+        should "fail" do
+          @bur = build(:bulk_update_request, script: "imply a -> b\nimply b -> a\n" * 2)
+
+          assert_equal(false, @bur.valid?)
+          assert_equal(["Duplicate line found: create implication [[a]] -> [[b]]", "Duplicate line found: create implication [[b]] -> [[a]]"], @bur.errors.full_messages)
+        end
+      end
     end
 
     context "when the script is updated" do
@@ -978,6 +1000,15 @@ class BulkUpdateRequestTest < ActiveSupport::TestCase
 
         assert_equal(false, @bur.valid?)
         assert_equal(["Can't deprecate [[no_wiki]] (tag must have a wiki page)"], @bur.errors[:base])
+      end
+
+      should "not work for tags with a deleted wiki page" do
+        create(:tag, name: "deleted_wiki")
+        create(:wiki_page, title: "deleted_wiki", is_deleted: true)
+        @bur = build(:bulk_update_request, script: "deprecate deleted_wiki")
+
+        assert_equal(false, @bur.valid?)
+        assert_equal(["Can't deprecate [[deleted_wiki]] (wiki page is deleted)"], @bur.errors[:base])
       end
     end
 

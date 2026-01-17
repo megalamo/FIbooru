@@ -37,7 +37,15 @@ class ForumPost < ApplicationRecord
   mentionable(
     message_field: :body,
     title: ->(_user_name) {%{#{creator.name} mentioned you in topic ##{topic_id} (#{topic.title})}},
-    body: ->(user_name) {%{@#{creator.name} mentioned you in topic ##{topic_id} ("#{topic.title}":[#{Routes.forum_topic_path(topic, page: forum_topic_page)}]):\n\n[quote]\n#{DText.new(body).extract_mention("@#{user_name}")}\n[/quote]\n}}
+    body: lambda { |user_name|
+      <<~EOF
+        @#{creator.name} mentioned you in forum ##{id} ("#{topic.title}":[#{Routes.forum_topic_path(topic, page: forum_topic_page)}]). This is an excerpt from the message:
+
+        [quote]
+        #{DText.new(body).extract_mention("@#{user_name}")}
+        [/quote]
+      EOF
+    },
   )
 
   module SearchMethods
@@ -159,7 +167,7 @@ class ForumPost < ApplicationRecord
   end
 
   def quoted_response
-    DText.new(body).quote(creator.name)
+    DText.new(body).quote(self)
   end
 
   def forum_topic_page
@@ -191,7 +199,7 @@ class ForumPost < ApplicationRecord
 
   def build_response
     dup.tap do |x|
-      x.body = x.quoted_response
+      x.body = quoted_response
     end
   end
 

@@ -450,12 +450,11 @@ class DText
 
   # Wrap a DText message in a [quote] block.
   #
-  # @param message [String] the DText to quote
-  # @param creator_name [String] the name of the user to quote.
+  # @param object [String] the object being quoted (a forum post, a comment, etc)
   # @return [String] the quoted DText
-  def quote(creator_name)
+  def quote(object)
     stripped_body = strip_blocks("quote")
-    "[quote]\n#{creator_name} said:\n\n#{stripped_body}\n[/quote]\n\n"
+    "[quote]\n#{object.creator.name} said in #{object.dtext_shortlink}:\n\n#{stripped_body}\n[/quote]\n\n"
   end
 
   # Remove all [<tag>] blocks from the DText.
@@ -725,7 +724,7 @@ class DText
   # @param needle [String] the string to search for
   # @return [String] the first paragraph mentioning the search string
   def extract_mention(needle)
-    ActionController::Base.helpers.excerpt(dtext.gsub(/\r\n|\r|\n/, "\n"), needle, separator: "\n\n", radius: 1, omission: "")
+    ActionController::Base.helpers.excerpt(strip_blocks("quote").gsub(/\r\n|\r|\n/, "\n"), needle, separator: "\n\n", radius: 1, omission: "\n[...]\n").strip
   end
 
   # Generate a short plain text excerpt from a DText string.
